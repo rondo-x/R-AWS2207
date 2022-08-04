@@ -10,3 +10,10 @@
 - lecture03.mdに課題3の内容記載
 - pushの実施
 - Pull Requestを発行
+### 実施内容3(課題4)
+- ブランチ: lecture04を作成
+- lecture04_cnct.pngを作成(RDSへ接続時画像)
+- lecture04.drawio.pngを作成(構成図)
+- pushの実施
+- Pull Requestを発行
+
