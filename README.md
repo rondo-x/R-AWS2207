@@ -17,8 +17,7 @@
 - pushの実施
 - Pull Requestを発行
 ### 実施内容4(課題5)
-- ブランチ: lecture05を作成
-- 同一マシン(EC2)上にサンプルアプリをデプロイする (rails/unicorn/nginxを使用する)
+- サンプルアプリをデプロイする (rails/unicorn/nginxを使用する)
 
 詳細
 1. APとWeb Server を同一マシンで構築し、ALBを設定して公開する 
