@@ -1,0 +1,84 @@
+﻿AWSTemplateFormatVersion: "2010-09-09"
+Description: Raisetech Main 
+Parameters:
+  NameBase:
+    Description: this is base name.
+    Type: String
+    Default: RaisetechCF
+
+  VpcTemplateURL:
+    Description: URL of VPC Template file
+    Type: String
+    Default: https://aws-raisetech-cf.s3.ap-northeast-1.amazonaws.com/rt_vpc.yml
+
+  EC2WebTemplateURL:
+    Description: URL of EC2(Web) Template file
+    Type: String
+    Default: https://aws-raisetech-cf.s3.ap-northeast-1.amazonaws.com/rt_ec2web.yml
+
+  EC2ApTemplateURL:
+    Description: URL of EC2(AP) Template file
+    Type: String
+    Default: https://aws-raisetech-cf.s3.ap-northeast-1.amazonaws.com/rt_ec2ap.yml
+
+  RdsTemplateURL:
+    Description: URL of RDS(MySQL) Template file
+    Type: String
+    Default: https://aws-raisetech-cf.s3.ap-northeast-1.amazonaws.com/rt_Rds_mysql.yml
+
+  LbTemplateURL:
+    Description: URL of ALB Template file
+    Type: String
+    Default: https://aws-raisetech-cf.s3.ap-northeast-1.amazonaws.com/rt_alb.yml
+
+
+Resources:
+
+  # VPCの作成
+  01VPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref VpcTemplateURL
+#      Parameters:
+
+  # EC2(Web)の作成
+  02EC2Web:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref  EC2WebTemplateURL
+#      Parameters:
+    DependsOn: 01VPC
+
+  # EC2(AP)の作成
+  03EC2AP:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref  EC2ApTemplateURL
+#      Parameters:
+    DependsOn: 01VPC
+
+  # RDS(MySQL)の作成
+  04RDS:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref  RdsTemplateURL
+#      Parameters:
+    DependsOn: [01VPC, 03EC2AP]
+
+  # LoadBalancer(ALB)の作成
+  05ALB:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref  LbTemplateURL
+#      Parameters:
+    DependsOn: [01VPC, 02EC2Web, 03EC2AP]
+
+Outputs: 
+  WebSvrPublicIP:
+    Value: !GetAtt 02EC2Web.Outputs.URL
+    Description: "Public IP of Web server"
+
+  AlbDNS:
+    Value: !GetAtt 05ALB.Outputs.DNSName
+    Description: "The DNS name for the load balancer"
+

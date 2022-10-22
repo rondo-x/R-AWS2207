@@ -1,0 +1,147 @@
+﻿AWSTemplateFormatVersion: "2010-09-09"
+Description: AP Server (Raisetech)
+Parameters:
+  NameBase:
+    Description: this is base name.
+    Type: String
+    Default: RaisetechCF
+
+  EC2InstanceType:
+    Description: Instance type of ApSrv
+    Type: String
+    Default: t2.micro
+    AllowedValues: 
+      - t2.midium
+      - t2.micro
+
+  EC2KeyName:
+    Description: SSH public key
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: aws-raisetech-splApp
+
+  EC2PrivateIP:
+    Description: Private IP Address
+    Type: String
+    Default: 10.0.10.50
+
+
+Resources:
+
+#===================================================
+# Security Group
+#===================================================
+
+# ●EC2 AP Server配置用
+#---------------------------------
+  cfSecurityGroupAP:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: cfRaisetechAPSecGr
+      GroupDescription: SecurityGroupAP
+      VpcId: !ImportValue
+        Fn::Sub: VPC-${NameBase}
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: "22"
+        ToPort: "22"
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: "80"
+        ToPort: "80"
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: "3389"
+        ToPort: "3389"
+
+
+#===================================================
+# ●EC2 (AP Server)
+#===================================================
+  cfAP1Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-07200fa04af91f087 # ubuntu
+      HibernationOptions: # 休止動作
+        Configured: false
+      KeyName: !Ref EC2KeyName # 作成済のキーペア
+      InstanceType: !Ref EC2InstanceType
+      CreditSpecification:
+        CPUCredits: standard # CPUクレジット
+      EnclaveOptions: # Nitro Enclaves
+        Enabled: false
+
+      NetworkInterfaces: # インターフェースの設定
+        - AssociatePublicIpAddress: "true" # Public IP自動割り当て有効 
+          DeviceIndex: "0" # 0起算
+          SubnetId: !ImportValue
+            Fn::Sub: PublicSubNet-1a-${NameBase} # Subnet指定
+          GroupSet:
+            - !Ref cfSecurityGroupAP # セキュリティグループ指定
+          PrivateIpAddress: !Ref EC2PrivateIP # プライベートIPアドレス指定
+
+      InstanceInitiatedShutdownBehavior: stop # Shutdown
+      Tenancy: default # 同じ物理ハードウェアを共有 
+
+      Tags:
+          - Key: Name
+            Value: !Sub EC2AP-${NameBase}
+      
+      BlockDeviceMappings: #ストレージの設定
+        - DeviceName: /dev/sda1 # デバイス名
+          Ebs:
+            VolumeType: gp2 # ボリュームタイプ
+            DeleteOnTermination: true # インスタンス終了時に削除 
+            VolumeSize: 30 # ディスクサイズ (GiB)
+
+
+      # 構築後に実行するコマンド 
+      UserData: !Base64
+        Fn::Base64: |
+          #!/bin/bash
+          sudo apt -y update
+#          sudo apt -y upgrade # X: configurationが表示
+#          sudo apt-get install -y curl git-core build-essential zlib1g-dev libssl-dev libreadline-dev libyaml-dev libsqlite3-dev sqlite3 libcurl4-openssl-dev libxml2-dev libxslt1-dev # X: configurationが表示
+          # rbenvインストール
+#          git clone https://github.com/sstephenson/rbenv.git ~/.rbenv
+          #環境変数設定(.bashrc)
+#          echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> ~/.bashrc
+#          echo 'eval "$(rbenv init -)"' >> ~/.bashrc
+          # .bashrcを読み込み
+#          source ~/.bashrc
+          # rbenvのプラグイン「ruby-build」をインストール
+#          git clone https://github.com/rbenv/ruby-build.git "$(rbenv root)"/plugins/ruby-build
+          # rubyインストール 
+#          rbenv install 2.6.3
+#          rbenv install 2.7.6 # rails6.1.3.1をインストールするためにダミーインストール 
+#           rbenv rehash
+#           rbenv global 2.7.6
+          # Rails インストール
+#          gem install -v 6.1.3.1 rails
+          # bundler インストール 
+#          gem install bundler -v 2.3.14
+          # MySQL インストール
+#          wget -O mysql8.deb https://dev.mysql.com/get/mysql-apt-config_0.8.23-1_all.deb
+#          sudo dpkg -i mysql8.deb # X: configurationが表示
+#          sudo apt -y update
+#          rm -f mysql8.deb
+#          sudo apt install -y mysql-server # X: configurationが表示
+#          sudo apt-get install -y libmysqlclient-dev # X: configurationが表示
+#======================================================================================================================
+Outputs: 
+  SecurityGroupAP:
+    Description: "Security Group (AP)"
+    Value: !Ref cfSecurityGroupAP
+    Export:
+      Name: !Sub SG-AP-${NameBase}
+
+  EC2AP:
+    Description: "EC2 Instance (AP)"
+    Value: !Ref cfAP1Instance
+    Export:
+      Name: !Sub EC2-AP-${NameBase}
+
+  URL: 
+    Value: 
+      Fn::Join: ["", ["http://", Fn::GetAtt: ["cfAP1Instance", "PublicIp"]]]
+    Description: "Newly created application URL"
