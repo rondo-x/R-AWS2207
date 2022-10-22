@@ -1,0 +1,201 @@
+﻿AWSTemplateFormatVersion: "2010-09-09"
+Description: DB for AP (Raisetech)
+Parameters:
+  NameBase:
+    Description: this is base name.
+    Type: String
+    Default: RaisetechCF
+
+
+  DBInstanceClass:
+    Description: instance class 
+    Type: String
+    Default: db.t3.micro
+
+  MasterUserName:
+    Description: master user name 
+    Type: String
+    Default: root
+
+  MasterUserPW:
+    Description: master user password 
+    Type: String
+    Default: XxZ123XXXx4
+
+  AllocatedStorageSize:
+    Description: strage size 
+    Type: String
+    Default: 20
+
+
+Resources:
+
+#===================================================
+# Security Group
+#===================================================
+
+
+# EC2 DB用
+#---------------------------------
+  cfSecurityGroupDB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: cfRaisetechDbSecGr
+      GroupDescription: SecurityGroupDB
+      VpcId: !ImportValue
+        Fn::Sub: VPC-${NameBase}
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: "3306"
+        ToPort: "3306"
+
+
+#===================================================
+# Subnet Group
+#===================================================
+
+# RDS Subnet Group
+#---------------------------------
+  cfRdsSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupName: !Sub cfRisetechDbSubnetGr
+      DBSubnetGroupDescription: SubnetGroupDB
+      SubnetIds: 
+        - !ImportValue
+            Fn::Sub: PrivateSubNet-1a-${NameBase} # Subnet指定
+        - !ImportValue
+            Fn::Sub: PrivateSubNet-1c-${NameBase} # Subnet指定
+#      Tags: 
+#        - Tag
+
+
+
+#===================================================
+# RDS Parameter Group
+#===================================================
+  cfDBParameterGroup:
+    Type: "AWS::RDS::DBParameterGroup"
+    Properties:
+      Family: mysql8.0
+      Description: ParamGroupDB
+
+
+#===================================================
+# Option Group
+#===================================================
+
+# RDS Option Group 
+#---------------------------------
+  cfDBOptionGroup:
+    Type: AWS::RDS::OptionGroup
+    Properties: 
+      EngineName: mysql
+      MajorEngineVersion: 8.0
+      OptionGroupDescription: OptionGroupDB
+#      OptionConfigurations: 
+#        - OptionName: MARIADB_AUDIT_PLUGIN
+
+
+#===================================================
+# RDS (MySQL)
+#===================================================
+  cfDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      AllocatedStorage: !Ref AllocatedStorageSize
+      AllowMajorVersionUpgrade: false
+#      AssociatedRoles: 
+#        - DBInstanceRole
+      AutoMinorVersionUpgrade: true
+      AvailabilityZone: ap-northeast-1a # [追加] 1cになったので明示 
+      BackupRetentionPeriod: 0 # 自動バックアップなし
+#      CACertificateIdentifier: String
+#      CharacterSetName: String
+      CopyTagsToSnapshot: true # DBインスタンスのタグをSnapshotへコピーする
+#      CustomIAMInstanceProfile: String
+#      DBClusterIdentifier: !Sub cf-rds-${NameBase}
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: !Sub ap-db-${NameBase}
+#      DBName: String
+      DBParameterGroupName: !Ref cfDBParameterGroup
+#      DBSecurityGroups: 
+#        - 
+#      DBSnapshotIdentifier: String
+      DBSubnetGroupName: !Ref cfRdsSubnetGroup
+      DeleteAutomatedBackups: true
+      DeletionProtection: false
+#      Domain: String
+#      DomainIAMRoleName: String
+#      EnableCloudwatchLogsExports: 
+#        - String
+#      EnableIAMDatabaseAuthentication: Boolean
+#      EnablePerformanceInsights: Boolean
+      Engine: mysql
+      EngineVersion: 8.0
+#      Iops: Integer
+#      KmsKeyId: String
+#      LicenseModel: String
+      MasterUsername: !Ref MasterUserName
+      MasterUserPassword: !Ref MasterUserPW
+#      MaxAllocatedStorage: Integer
+#      MonitoringInterval: Integer
+#      MonitoringRoleArn: String
+      MultiAZ: false
+#      NcharCharacterSetName: String
+      OptionGroupName: !Ref cfDBOptionGroup 
+#      PerformanceInsightsKMSKeyId: String
+#      PerformanceInsightsRetentionPeriod: Integer
+#      Port: String
+#      PreferredBackupWindow: String
+#      PreferredMaintenanceWindow: String
+#      ProcessorFeatures: 
+#        - Name: coreCount
+#          Value: 2
+#      PromotionTier: Integer
+      PubliclyAccessible: false # 内部インスタンス(Private IPアドレスで解決されるDNSを持つ) 
+#      SourceDBInstanceIdentifier: String
+#      SourceRegion: String
+#      StorageEncrypted: Boolean
+      StorageType: gp2
+      Tags: 
+        - Key: Name
+          Value: !Sub cf-RDS-MySQL-${NameBase}
+#      Timezone: String
+#      UseDefaultProcessorFeatures: Boolean
+      VPCSecurityGroups: # DBSecurityGroupsは使用しないこと(旧バージョンとの互換性用)
+        - !Ref cfSecurityGroupDB
+    DeletionPolicy: Delete
+
+
+#======================================================================================================================
+Outputs: 
+  SecurityGroupDB:
+    Description: "Security Group (DB)"
+    Value: !Ref cfSecurityGroupDB
+    Export:
+      Name: !Sub SG-DB-${NameBase}
+
+  SubnetGroupDB:
+    Description: "Subnet Group (DB)"
+    Value: !Ref cfRdsSubnetGroup
+    Export:
+      Name: !Sub SubnetG-DB-${NameBase}
+
+  ParameterGroupDB:
+    Description: "Parameter Group (DB)"
+    Value: !Ref cfDBParameterGroup
+    Export:
+      Name: !Sub PG-DB-${NameBase}
+
+  OptionGroupDB:
+    Description: "Option Group (DB)"
+    Value: !Ref cfDBOptionGroup
+    Export:
+      Name: !Sub OG-DB-${NameBase}
+
+  Endpoint: 
+    Value: 
+      Fn::GetAtt: ["cfDBInstance", "Endpoint.Address"]
+    Description: "The connection endpoint for the database."

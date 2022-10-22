@@ -23,3 +23,14 @@
 1. APとWeb Server を同一マシンで構築し、ALBを設定して公開する 
 2. APとWeb Server を別マシンで構築し、Web ServerにALBを設定して公開する 
 3. S3にCLIで画像をコピーし、サンプルアプリで参照・表示する
+
+### 実施内容5(課題10)
+- 課題5のインフラ構成図(lecture05_2)を自動で再現する (Cloud Formationを使用する)
+
+テンプレート補足
+1. 「rt_main.yml」で依存関係を定義し、以下ymlのスタックも生成
+2. 「rt_vpc.yml」でVPC,各種Subnetを生成
+3. 「rt_ec2web.yml」でWeb Serverを生成
+4. 「rt_ec2ap.yml」でAP Serverを生成
+5. 「rt_Rds_mysql.yml」でDB(MySQL)を生成
+6. 「rt_alb.yml」でload Balancer(ALB)を生成

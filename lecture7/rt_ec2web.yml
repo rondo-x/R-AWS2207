@@ -1,0 +1,120 @@
+﻿AWSTemplateFormatVersion: "2010-09-09"
+Description: Web Server
+Parameters:
+  NameBase:
+    Description: this is base name.
+    Type: String
+    Default: RaisetechCF
+
+  EC2InstanceType:
+    Description: Instance type of WebSrv
+    Type: String
+    Default: t2.micro
+#    AllowedValues: 
+#      - t2.midium
+#      - t2.micro
+
+  EC2KeyName:
+    Description: SSH public key
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: aws-raisetech-ssh-key
+
+  EC2PrivateIP:
+    Description: Private IP Address
+    Type: String
+    Default: 10.0.10.10
+
+
+Resources:
+#===================================================
+# Security Group
+#===================================================
+
+# ●EC2 Web Server配置用
+#---------------------------------
+  cfSecurityGroupWeb:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: cfRaisetechWebSecGr
+      GroupDescription: SecurityGroupWeb
+      VpcId: !ImportValue
+        Fn::Sub: VPC-${NameBase}
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: "22"
+        ToPort: "22"
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: "80"
+        ToPort: "80"
+
+
+
+#===================================================
+# ●EC2 (Web Server)
+#===================================================
+  cfWeb1Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0f36dcfcc94112ea1 # Amazon Linux2
+      HibernationOptions: # 休止動作
+        Configured: false
+      KeyName: !Ref EC2KeyName # 作成済のキーペア
+      InstanceType: !Ref EC2InstanceType
+      CreditSpecification:
+        CPUCredits: standard # CPUクレジット
+      EnclaveOptions: # Nitro Enclaves
+        Enabled: false
+
+      NetworkInterfaces: # インターフェースの設定
+        - AssociatePublicIpAddress: "true" # Public IP自動割り当て有効 
+          DeviceIndex: "0" # 0起算
+          SubnetId: !ImportValue
+            Fn::Sub: PublicSubNet-1a-${NameBase} # Subnet指定
+          GroupSet:
+            - !Ref cfSecurityGroupWeb # 既存のセキュリティグループ指定
+          PrivateIpAddress: !Ref EC2PrivateIP # プライベートIPアドレス指定
+
+      InstanceInitiatedShutdownBehavior: stop # Shutdown
+      Tenancy: default # 同じ物理ハードウェアを共有 
+
+      Tags:
+          - Key: Name
+            Value: !Sub EC2Web-${NameBase}
+      
+      BlockDeviceMappings: #ストレージの設定
+        - DeviceName: /dev/xvda # デバイス名
+          Ebs:
+            VolumeType: gp2 # ボリュームタイプ
+            DeleteOnTermination: true # インスタンス終了時に削除 
+            VolumeSize: 20 # ディスクサイズ (GiB)
+
+
+      # 構築後に実行するコマンド 
+      UserData: !Base64
+        Fn::Base64: |
+          #!/bin/bash
+          sudo yum -y update
+          sudo yum -y groupinstall "Development Tools"
+          sudo amazon-linux-extras install -y nginx1
+          sudo systemctl start nginx
+
+#======================================================================================================================
+Outputs: 
+  SecurityGroupWeb:
+    Description: "Security Group (Web)"
+    Value: !Ref cfSecurityGroupWeb
+    Export:
+      Name: !Sub SG-Web-${NameBase}
+
+  EC2AP:
+    Description: "EC2 Instance (Web)"
+    Value: !Ref cfWeb1Instance
+    Export:
+      Name: !Sub EC2-Web-${NameBase}
+
+  URL: 
+    Value: 
+      Fn::Join: ["", ["http://", Fn::GetAtt: ["cfWeb1Instance", "PublicIp"]]]
+    Description: "Newly created application URL"

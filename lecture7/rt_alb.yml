@@ -1,0 +1,177 @@
+﻿AWSTemplateFormatVersion: "2010-09-09"
+Description: LoadBalancer (Raisetech)
+Parameters:
+  NameBase:
+    Description: this is base name.
+    Type: String
+    Default: RaisetechCF
+
+  FrontendHealthCheckPath:                                               #(C)
+    Description: Frontend WebApp health check path
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: ^[-\.\/a-zA-Z0-9]*$
+    Default: /
+
+
+Mappings:
+  DeployEnvMap:
+    Dev:
+      Protocol: "HTTP"
+      Port: 80
+
+
+Resources:
+#===================================================
+# Security Group
+#===================================================
+
+# ●ALB用
+#---------------------------------
+  cfSecurityGroupALB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: cfRaisetechALBSecGr
+      GroupDescription: SecurityGroupALB
+      VpcId: !ImportValue
+        Fn::Sub: VPC-${NameBase}
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: "80"
+        ToPort: "80"
+
+
+#===================================================
+# Target Group
+#===================================================
+  cfTargetGroupALB:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: !Ref FrontendHealthCheckPath
+#      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      IpAddressType: ipv4
+      Matcher: 
+#        GrpcCode: String
+        HttpCode: 200
+      Name: cfRaisetechALBTgGr
+      Port: !FindInMap
+        - DeployEnvMap
+        - Dev
+        - Port
+      Protocol: !FindInMap
+        - DeployEnvMap
+        - Dev
+        - Protocol
+      ProtocolVersion: HTTP1
+      Tags: 
+        - Key: Name
+          Value: !Sub ALB-TG-${NameBase}
+      TargetGroupAttributes: 
+        - Key: load_balancing.algorithm.type
+          Value: round_robin
+      Targets:
+#        - AvailabilityZone: String
+        - Id: !ImportValue
+            Fn::Sub: EC2-Web-${NameBase}
+          Port: 80
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: !ImportValue
+        Fn::Sub: VPC-${NameBase}
+
+
+#===================================================
+# Load Balancing
+#===================================================
+  cfFrontendALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+#      IpAddressType: String
+#      LoadBalancerAttributes: 
+#        - LoadBalancerAttribute
+      Name: cfRisetechFrontendALB
+      Scheme: internet-facing
+      SecurityGroups: 
+        - !Ref cfSecurityGroupALB
+#      SubnetMappings: 
+#        - SubnetMapping
+      Subnets: 
+        - !ImportValue
+            Fn::Sub: PublicSubNet-1a-${NameBase}
+        - !ImportValue
+            Fn::Sub: PublicSubNet-1c-${NameBase}
+      Tags:
+          - Key: Name
+            Value: !Sub ALB-${NameBase}
+      Type: application
+
+
+#===================================================
+# Listener
+#===================================================
+  cfListenerALB:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+#      AlpnPolicy: 
+#        - String
+#      Certificates: 
+#        - Certificate
+      DefaultActions: 
+#        - AuthenticateCognitoConfig: 
+#            AuthenticateCognitoConfig
+#          AuthenticateOidcConfig: 
+#            AuthenticateOidcConfig
+#          FixedResponseConfig: 
+#            FixedResponseConfig
+#          ForwardConfig: 
+#            ForwardConfig
+#          Order: Integer
+#          RedirectConfig: 
+#            RedirectConfig
+        - TargetGroupArn: !Ref cfTargetGroupALB
+          Type: forward
+      LoadBalancerArn: !Ref cfFrontendALB
+#      Port: 0x50
+#      Protocol: HTTP
+      Port: !FindInMap
+        - DeployEnvMap
+        - Dev
+        - Port
+      Protocol: !FindInMap
+        - DeployEnvMap
+        - Dev
+        - Protocol
+#      SslPolicy: String
+
+
+#======================================================================================================================
+Outputs: 
+  SecurityGroupALB:
+    Description: "Security Group (ALB)"
+    Value: !Ref cfSecurityGroupALB
+    Export:
+      Name: !Sub SG-ALB-${NameBase}
+
+  TargetGroupALB:
+    Description: "Target Group (ALB)"
+    Value: !Ref cfTargetGroupALB
+    Export:
+      Name: !Sub TG-ALB-${NameBase}
+
+  LoadBalancerALB:
+    Description: "LoadBalancer (ALB)"
+    Value: !Ref cfFrontendALB
+    Export:
+      Name: !Sub ALB-${NameBase}
+
+  DNSName: 
+    Value: 
+      Fn::GetAtt: ["cfFrontendALB", "DNSName"]
+    Description: "The DNS name for the load balancer"

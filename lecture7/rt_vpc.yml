@@ -1,0 +1,207 @@
+﻿AWSTemplateFormatVersion: "2010-09-09"
+Description: VPC (Raisetech)
+
+Parameters:
+  NameBase:
+    Type: String
+    Default: RaisetechCF
+    Description: this is base name.
+
+
+Mappings:
+  Constant:
+    CydrBlock:
+      Vpc: "10.0.0.0/16"
+      PubSubNet1a: "10.0.10.0/24"
+      PrvSubNet1a: "10.0.11.0/24"
+      PubSubNet1c: "10.0.20.0/24"
+      PrvSubNet1c: "10.0.21.0/24"
+    AZone:
+      Main: "ap-northeast-1a"
+      Sub: "ap-northeast-1c"
+
+
+Resources:
+#===================================================
+# Create VPC
+#===================================================
+  cfRaisetechVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap
+        - Constant 
+        - CydrBlock 
+        - Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub vpc-${NameBase}
+#===================================================
+# Internet Gateway
+#===================================================
+  cfIGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub IGW-${NameBase}
+
+
+  cfAttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref cfRaisetechVPC
+      InternetGatewayId: !Ref cfIGW
+
+
+#===================================================
+# Subnet
+#===================================================
+
+# Public Subnet 1a : AP, Web Server配置用
+#---------------------------------
+  cfPubSubNet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !FindInMap
+        - Constant
+        - AZone
+        - Main
+      VpcId: !Ref cfRaisetechVPC
+      CidrBlock: !FindInMap
+        - Constant
+        - CydrBlock
+        - PubSubNet1a
+      MapPublicIpOnLaunch: true # パブリックIPを取得する
+      Tags:
+        - Key: Name
+          Value: !Sub PublicSubNet-1a-${NameBase}
+
+
+# Private Subnet 1a : DB配置用
+#---------------------------------
+  cfPrvSubNet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !FindInMap
+        - Constant
+        - AZone
+        - Main
+      VpcId: !Ref cfRaisetechVPC
+      CidrBlock: !FindInMap
+        - Constant
+        - CydrBlock
+        - PrvSubNet1a
+      Tags:
+        - Key: Name
+          Value: !Sub PrvSubNet-1a-${NameBase}
+
+
+# Public Subnet 1c : ロードバランサー配置時のダミー
+#---------------------------------
+  cfPubSubNet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !FindInMap
+        - Constant
+        - AZone
+        - Sub
+      VpcId: !Ref cfRaisetechVPC
+      CidrBlock: !FindInMap
+        - Constant
+        - CydrBlock
+        - PubSubNet1c
+      MapPublicIpOnLaunch: true # パブリックIPを取得する
+      Tags:
+        - Key: Name
+          Value: !Sub PubSubNet-1c-${NameBase}
+
+
+
+# Private Subnet 1c : DB配置時のダミー
+#---------------------------------
+  cfPrvSubNet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !FindInMap
+        - Constant
+        - AZone
+        - Sub
+      VpcId: !Ref cfRaisetechVPC
+      CidrBlock: !FindInMap
+        - Constant
+        - CydrBlock
+        - PrvSubNet1c
+      Tags:
+        - Key: Name
+          Value: !Sub PrvSubNet-1c-${NameBase}
+
+
+
+#===================================================
+# Route Table
+#===================================================
+
+# Public Subnet 1a : Web, AP Server共通
+#---------------------------------
+  # Create Route Table
+  cfPubRouteTable1a:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref cfRaisetechVPC
+      Tags:
+        - Key: Name
+          Value: !Sub RouteTable1-${NameBase}
+
+  # Setup Route
+  cfPubRoute1a:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref cfPubRouteTable1a
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref cfIGW
+    DependsOn: 
+      - cfPublicSubNet1RTableAss
+
+  # Associate route table for Subnet1
+  cfPublicSubNet1RTableAss:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref cfPubSubNet1a
+      RouteTableId: !Ref cfPubRouteTable1a
+
+
+
+#======================================================================================================================
+Outputs: 
+  VPCId:
+    Description: "VPC ID"
+    Value: !Ref cfRaisetechVPC
+    Export:
+      Name: !Sub VPC-${NameBase}
+
+
+  PubSubNet1a:
+    Description: "[main] public subnet"
+    Value: !Ref cfPubSubNet1a
+    Export:
+      Name: !Sub PublicSubNet-1a-${NameBase}
+
+  PrvSubNet1a:
+    Description: "[main] private subnet"
+    Value: !Ref cfPrvSubNet1a
+    Export:
+      Name: !Sub PrivateSubNet-1a-${NameBase}
+
+  PubSubNet1c:
+    Description: "[sub] public subnet"
+    Value: !Ref cfPubSubNet1c
+    Export:
+      Name: !Sub PublicSubNet-1c-${NameBase}
+
+  PrvSubNet1c:
+    Description: "[sub] private subnet"
+    Value: !Ref cfPrvSubNet1c
+    Export:
+      Name: !Sub PrivateSubNet-1c-${NameBase}
+
+
