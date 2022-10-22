@@ -16,4 +16,10 @@
 - lecture04.drawio.pngを作成(構成図)
 - pushの実施
 - Pull Requestを発行
+### 実施内容4(課題5)
+- サンプルアプリをデプロイする (rails/unicorn/nginxを使用する)
 
+詳細
+1. APとWeb Server を同一マシンで構築し、ALBを設定して公開する 
+2. APとWeb Server を別マシンで構築し、Web ServerにALBを設定して公開する 
+3. S3にCLIで画像をコピーし、サンプルアプリで参照・表示する
